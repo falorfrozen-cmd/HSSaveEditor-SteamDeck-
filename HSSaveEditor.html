@@ -1,0 +1,829 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hero Siege Character Save Editor - Offline Web</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0f172a;
+      --panel: #111827;
+      --card: #1f2937;
+      --card2: #172033;
+      --field: #0b1120;
+      --border: #334155;
+      --text: #e5edf7;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent2: #0ea5e9;
+      --waypoint: #2563eb;
+      --danger: #ef4444;
+      --notice: #f59e0b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", system-ui, sans-serif;
+    }
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: minmax(280px, 360px) 1fr;
+    }
+    aside {
+      background: var(--panel);
+      padding: 18px;
+      border-right: 1px solid var(--border);
+      min-width: 0;
+    }
+    main { padding: 24px; min-width: 0; }
+    h1 { font-size: 22px; margin: 0 0 8px; }
+    h2 { font-size: 16px; margin: 0 0 10px; }
+    p { color: var(--muted); margin: 0 0 14px; line-height: 1.45; }
+    .notice {
+      border: 1px solid var(--notice);
+      background: var(--card2);
+      padding: 14px;
+      margin: 18px 0;
+    }
+    .notice strong { color: var(--notice); display: block; margin-bottom: 6px; }
+    .drop {
+      border: 1px dashed var(--border);
+      background: var(--field);
+      padding: 16px;
+      margin: 12px 0;
+      text-align: center;
+      color: var(--muted);
+    }
+    .drop.drag { border-color: var(--accent); color: var(--text); }
+    button, .file-label {
+      border: 0;
+      background: var(--card);
+      color: var(--text);
+      padding: 11px 14px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 42px;
+    }
+    button:hover, .file-label:hover { background: var(--border); }
+    button.primary { background: var(--accent); color: #04111f; }
+    button.primary:hover { background: var(--accent2); }
+    button.waypoint { background: var(--waypoint); color: #eff6ff; }
+    button.danger { background: var(--danger); color: #fff7ed; }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    input[type=file] { display: none; }
+    .file-label, aside button { width: 100%; margin-top: 8px; }
+    .slot-list {
+      list-style: none;
+      padding: 0;
+      margin: 14px 0 0;
+      border: 1px solid var(--border);
+      background: var(--field);
+      max-height: calc(100vh - 250px);
+      overflow: auto;
+      font-family: Consolas, monospace;
+    }
+    .slot-list li {
+      padding: 8px 10px;
+      border-bottom: 1px solid rgba(51,65,85,.45);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .slot-list li.active { background: var(--accent); color: #04111f; }
+    .card {
+      border: 1px solid var(--border);
+      background: var(--card);
+      padding: 16px;
+      margin-top: 14px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: minmax(140px, 210px) minmax(160px, 1fr) minmax(140px, 210px) minmax(160px, 1fr);
+      gap: 12px 18px;
+      align-items: center;
+    }
+    .prof-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(140px, 1fr));
+      gap: 14px 18px;
+    }
+    label { color: var(--text); }
+    input, select, textarea {
+      width: 100%;
+      background: var(--field);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 9px 10px;
+      font: inherit;
+      outline: none;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 16px 0; }
+    .status { color: var(--muted); margin-top: 12px; min-height: 24px; }
+    dialog {
+      width: min(1100px, calc(100vw - 28px));
+      height: min(760px, calc(100vh - 28px));
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      padding: 0;
+    }
+    dialog::backdrop { background: rgba(0,0,0,.65); }
+    .modal-head {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      padding: 12px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+    }
+    .modal-head h2 { margin: 0 auto 0 0; }
+    .modal-body { padding: 12px; height: calc(100% - 67px); min-height: 0; }
+    textarea.raw { height: 100%; resize: none; font-family: Consolas, monospace; }
+    .inspector {
+      display: grid;
+      grid-template-rows: minmax(240px, 1fr) minmax(180px, .65fr);
+      gap: 12px;
+      height: 100%;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      min-width: 980px;
+    }
+    th, td {
+      border-bottom: 1px solid rgba(51,65,85,.55);
+      text-align: left;
+      padding: 7px 8px;
+      vertical-align: top;
+    }
+    th { background: var(--card); position: sticky; top: 0; }
+    tr.selected { background: rgba(56,189,248,.22); }
+    .table-wrap, pre {
+      overflow: auto;
+      border: 1px solid var(--border);
+      background: var(--field);
+      margin: 0;
+    }
+    pre { padding: 12px; white-space: pre-wrap; font-family: Consolas, monospace; }
+    @media (max-width: 900px) {
+      .app { grid-template-columns: 1fr; }
+      .slot-list { max-height: 260px; }
+      .grid, .prof-grid { grid-template-columns: 1fr; }
+      main { padding: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside>
+      <h2>Save Files</h2>
+      <p>Select one or more `.hss` files.</p>
+      <label class="file-label" for="fileInput">Open .hss Files...</label>
+      <input id="fileInput" type="file" accept=".hss" multiple>
+      <div id="dropZone" class="drop">Drop `.hss` files here</div>
+      <button id="clearFiles">Clear List</button>
+      <ul id="slotList" class="slot-list"></ul>
+    </aside>
+    <main>
+      <h1 id="currentFile">No character save loaded</h1>
+      <p>Open a character `.hss` file, edit the fields, then download the edited save. Empty fields are not written.</p>
+      <div class="notice">
+        <strong>Important Notice</strong>
+        This editor is intended for offline/single-player character saves only. Do not use it with multiplayer, online characters, leaderboards, trading, or anti-cheat protected modes. Close the game before replacing a save file.
+      </div>
+      <section class="card">
+        <h2>Character Fields</h2>
+        <div id="characterFields" class="grid"></div>
+      </section>
+      <!-- Steam Deck/offline web build hides shop.ini-backed fields because the Deck file picker usually cannot reach shop.ini reliably. -->
+      <section class="card" hidden>
+        <h2>Professions</h2>
+        <div id="professionFields" class="prof-grid"></div>
+      </section>
+      <div class="actions">
+        <button id="rawBtn">Raw Decoded Text...</button>
+        <button id="inspectBtn">Inventory Inspector...</button>
+        <button id="downloadBtn" class="primary">Download Edited .hss</button>
+        <button id="directSaveBtn" class="primary">Save Directly...</button>
+        <button id="waypointsBtn" class="waypoint">Unlock All Waypoints</button>
+        <button id="infernoBtn" class="danger">Unlock Inferno Difficulty</button>
+      </div>
+      <div id="status" class="status">Ready</div>
+    </main>
+  </div>
+
+  <dialog id="rawDialog">
+    <div class="modal-head">
+      <h2>Raw Decoded Text</h2>
+      <input id="rawSearch" placeholder="Search" style="max-width:260px">
+      <button id="rawFind">Find</button>
+      <button id="rawClose">Close</button>
+    </div>
+    <div class="modal-body"><textarea id="rawText" class="raw" spellcheck="false"></textarea></div>
+  </dialog>
+
+  <dialog id="inspectorDialog">
+    <div class="modal-head">
+      <h2>Inventory Inspector - Read Only</h2>
+      <button id="inspectorClose">Close</button>
+    </div>
+    <div class="modal-body">
+      <div class="inspector">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Section</th><th>Container</th><th>Item</th><th>Pos</th><th>Decoded Data</th><th>s1-s6 Stat Slots</th></tr></thead>
+            <tbody id="inspectorRows"></tbody>
+          </table>
+        </div>
+        <pre id="inspectorDetails">Select an item.</pre>
+      </div>
+    </div>
+  </dialog>
+
+  <script>
+  "use strict";
+
+  const HSS_XOR_KEY = Uint8Array.from([
+    0xE3,0x95,0x3D,0xB1,0x01,0x6B,0xB6,0x58,0x54,0x38,0x3F,0x46,0xA1,0x74,0x29,0xCC,
+    0x45,0x45,0x51,0xF2,0xA7,0xF7,0xAB,0xB7,0x26,0xF1,0x37,0xA8,0x81,0x91,0xE6,0x7E
+  ]);
+  const CLASS_ID_TO_NAME = {
+    1:"Viking",2:"Pyromancer",3:"Marksman",4:"Pirate",5:"Nomad",6:"Redneck",7:"Necromancer",8:"Samurai",
+    9:"Paladin",10:"Amazon",11:"Demon Slayer",12:"Demonspawn",13:"Shaman",14:"White Mage",15:"Marauder",
+    16:"Plague Doctor",17:"Shield Lancer",18:"Illusionist",19:"Jotunn",20:"Exo",21:"Butcher",22:"Stormweaver",
+    23:"Bard",24:"Prophet"
+  };
+  const CLASS_NAME_TO_ID = Object.fromEntries(Object.entries(CLASS_ID_TO_NAME).map(([id, name]) => [name.toLowerCase(), Number(id)]));
+  const CHARACTER_FIELDS = [
+    {label:"Name", section:"0", key:"name", kind:"text"},
+    {label:"Class", section:"0", key:"class", kind:"number", classField:true},
+    {label:"Level (level=)", section:"0", key:"level", kind:"number"},
+    {label:"Hero Level (herolevel=)", section:"0", key:"herolevel", kind:"number"},
+    {label:"Experience", section:"0", key:"experience", kind:"number"},
+    {label:"Wormhole Level", section:"0", key:"wormhole_level", kind:"number"}
+  ];
+  // Steam Deck/offline web build: keep shop.ini-backed field definitions here for future re-enable,
+  // but do not expose them because Steam Deck users usually cannot select shop.ini from the browser picker.
+  const SHOP_BACKED_FIELDS = [
+    {label:"Gold", section:"gold", key:"gold", kind:"number", extra:["gold_hc"], defaultValue:"0"},
+    {label:"Herbalism", section:"herbalism", key:"herbalism", kind:"number", extra:["herbalism_hc"]},
+    {label:"Enchanting", section:"enchanting", key:"enchanting", kind:"number", extra:["enchanting_hc"]},
+    {label:"Jewelcrafting", section:"jewelcrafting", key:"jewelcrafting", kind:"number", extra:["jewelcrafting_hc"]},
+    {label:"Mining", section:"mining", key:"mining", kind:"number", extra:["mining_hc"]}
+  ];
+  const PROFESSION_FIELDS = [];
+  const ALL_FIELDS = CHARACTER_FIELDS;
+  const state = { files: [], activeIndex: -1, raw: "", rawDirty: false, shopFile: null, shopRaw: null };
+
+  const $ = (id) => document.getElementById(id);
+  const status = (message) => $("status").textContent = message;
+  const normalizeLineEndings = (text) => text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const escapeHtml = (s) => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const parseNumber = (value) => Number(String(value || "0").replace(",", "."));
+
+  function bytesToBase64(bytes) {
+    let binary = "";
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+    }
+    return btoa(binary);
+  }
+
+  function base64ToBytes(text) {
+    const binary = atob(text);
+    const out = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
+    return out;
+  }
+
+  function xorBytes(data) {
+    const out = new Uint8Array(data.length);
+    for (let i = 0; i < data.length; i++) out[i] = data[i] ^ HSS_XOR_KEY[i % HSS_XOR_KEY.length];
+    return out;
+  }
+
+  async function streamTransform(format, bytes, mode) {
+    const Ctor = mode === "compress" ? window.CompressionStream : window.DecompressionStream;
+    if (!Ctor) throw new Error("This browser does not support CompressionStream/DecompressionStream.");
+    const stream = new Blob([bytes]).stream().pipeThrough(new Ctor(format));
+    return new Uint8Array(await new Response(stream).arrayBuffer());
+  }
+
+  async function decodeHssFile(file) {
+    const rawBytes = new Uint8Array(await file.arrayBuffer());
+    if (!rawBytes.some(b => ![0,9,10,13,32].includes(b))) throw new Error("This save slot is empty.");
+    const plainProbe = normalizeLineEndings(new TextDecoder("utf-8", {fatal:false}).decode(rawBytes).replace(/\0/g, ""));
+    if (looksLikePlainCharacterIni(plainProbe)) return plainProbe;
+    const encoded = plainProbe.replace(/[\s\0]/g, "");
+    let compressed;
+    try {
+      compressed = base64ToBytes(encoded);
+    } catch {
+      throw new Error("This file is not a supported encoded Hero Siege character save.");
+    }
+    const obfuscated = await streamTransform("deflate", compressed, "decompress");
+    const decoded = xorBytes(obfuscated);
+    const payload = new Uint8Array(Math.ceil(decoded.length / 2));
+    for (let i = 0, j = 0; i < decoded.length; i += 2, j++) payload[j] = decoded[i];
+    return normalizeLineEndings(new TextDecoder("utf-8", {fatal:false}).decode(payload));
+  }
+
+  async function encodeHssText(text) {
+    const payload = new TextEncoder().encode(normalizeLineEndings(text));
+    const utf16ish = new Uint8Array(payload.length * 2);
+    for (let i = 0; i < payload.length; i++) utf16ish[i * 2] = payload[i];
+    const obfuscated = xorBytes(utf16ish);
+    const compressed = await streamTransform("deflate", obfuscated, "compress");
+    return bytesToBase64(compressed);
+  }
+
+  async function pickFileForSave(suggestedName, pickerId, description, accept) {
+    if (!window.showSaveFilePicker) {
+      throw new Error("Direct save is not supported in this browser. Use Download instead.");
+    }
+    return await window.showSaveFilePicker({
+      id: pickerId,
+      suggestedName,
+      types: [{description, accept}]
+    });
+  }
+
+  async function writeBlobToHandle(handle, blob) {
+    const writable = await handle.createWritable();
+    try {
+      await writable.write(blob);
+    } finally {
+      await writable.close();
+    }
+  }
+
+  function looksLikePlainCharacterIni(text) {
+    const t = normalizeLineEndings(text).trimStart();
+    return /^\[[^\]]+\]\s*$/m.test(t) && /^(name|class|level|herolevel|experience)\s*=/m.test(t);
+  }
+
+  function getSections(text) {
+    text = normalizeLineEndings(text);
+    const matches = [...text.matchAll(/^\[([^\]]+)\]\s*$/gm)];
+    return matches.map((m, i) => ({
+      name: m[1],
+      body: text.slice(m.index + m[0].length, i + 1 < matches.length ? matches[i + 1].index : text.length)
+    }));
+  }
+
+  function stripOuterQuotes(value) {
+    value = String(value || "").trim();
+    return value.length >= 2 && value[0] === '"' && value.at(-1) === '"' ? value.slice(1, -1) : value;
+  }
+
+  function getIniFromBody(body, key) {
+    const re = new RegExp("^\\s*" + key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s*=\\s*(.*?)\\s*$", "m");
+    const m = body.match(re);
+    return m ? stripOuterQuotes(m[1]) : "";
+  }
+
+  function getIniValue(text, section, key) {
+    const found = getSections(text).find(s => s.name === section);
+    return found ? getIniFromBody(found.body, key) : "";
+  }
+
+  function formatDisplayValue(value, spec) {
+    if (spec.classField) {
+      const id = Math.trunc(parseNumber(value));
+      return CLASS_ID_TO_NAME[id] || value;
+    }
+    if (spec.kind !== "number") return value;
+    const n = parseNumber(value);
+    if (!Number.isFinite(n)) return value;
+    return Number.isInteger(n) ? String(n) : n.toFixed(6).replace(/0+$/, "").replace(/\.$/, "");
+  }
+
+  function getFieldValue(text, spec) {
+    let value = getIniValue(text, spec.section, spec.key);
+    if (value !== "") return formatDisplayValue(value, spec);
+    for (const key of spec.extra || []) {
+      value = getIniValue(text, spec.section, key);
+      if (value !== "") return formatDisplayValue(value, spec);
+    }
+    if (spec.defaultValue !== undefined) return formatDisplayValue(spec.defaultValue, spec);
+    return "";
+  }
+
+  function normalizeSaveValue(value, spec) {
+    value = String(value || "").trim();
+    if (spec.classField && CLASS_NAME_TO_ID[value.toLowerCase()]) return String(CLASS_NAME_TO_ID[value.toLowerCase()]);
+    return value;
+  }
+
+  function quoteValue(value, kind) {
+    value = String(value || "").trim();
+    if (kind === "number") {
+      const n = parseNumber(value);
+      if (!Number.isFinite(n)) throw new Error(`Invalid number: ${value}`);
+      return `"${n.toFixed(6)}"`;
+    }
+    return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+  }
+
+  function setIniValue(text, section, key, value, kind) {
+    text = normalizeLineEndings(text);
+    const replacement = quoteValue(value, kind);
+    const sections = getSections(text);
+    const found = sections.find(s => s.name === section);
+    if (!found) return text.replace(/\n*$/, "") + `\n[${section}]\n${key}=${replacement}\n`;
+    const headerRe = new RegExp("^\\[" + section.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\]\\s*$", "m");
+    const header = headerRe.exec(text);
+    const bodyStart = header.index + header[0].length;
+    const next = text.slice(bodyStart).search(/^\[[^\]]+\]\s*$/m);
+    const bodyEnd = next >= 0 ? bodyStart + next : text.length;
+    let body = text.slice(bodyStart, bodyEnd);
+    const keyRe = new RegExp("^(" + key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s*=\\s*).*$", "m");
+    if (keyRe.test(body)) body = body.replace(keyRe, `$1${replacement}`);
+    else body = body.replace(/\n*$/, "\n") + `${key}=${replacement}\n`;
+    return text.slice(0, bodyStart) + body + text.slice(bodyEnd);
+  }
+
+  function ensureSectionBeforeAnchor(text, section, anchors) {
+    if (new RegExp("^\\[" + section.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\]\\s*$", "m").test(text)) return text;
+    const anchorRe = new RegExp("^\\[(?:" + anchors.map(a => a.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|") + ")\\]\\s*$", "m");
+    const m = anchorRe.exec(text);
+    if (!m) return text.replace(/\n*$/, "\n") + `[${section}]\n`;
+    return text.slice(0, m.index).replace(/\n*$/, "\n") + `[${section}]\n` + text.slice(m.index);
+  }
+
+  function setFieldValue(text, spec, value) {
+    value = normalizeSaveValue(value, spec);
+    if (SHOP_BACKED_FIELDS.includes(spec) && spec.section !== "gold") text = ensureSectionBeforeAnchor(text, spec.section, ["shop","gold","minion","emotes","chat_options","0"]);
+    else if (spec.section === "gold") text = ensureSectionBeforeAnchor(text, spec.section, ["minion","emotes","chat_options","0"]);
+    text = setIniValue(text, spec.section, spec.key, value, spec.kind);
+    for (const key of spec.extra || []) text = setIniValue(text, spec.section, key, value, spec.kind);
+    return text;
+  }
+
+  function isShopBackedField(spec) {
+    return SHOP_BACKED_FIELDS.includes(spec);
+  }
+
+  function defaultShopIniText() {
+    return [
+      "[herbalism]", 'herbalism_hc="0.000000"', 'herbalism="0.000000"',
+      "[enchanting]", 'enchanting_hc="0.000000"', 'enchanting="0.000000"',
+      "[jewelcrafting]", 'jewelcrafting_hc="0.000000"', 'jewelcrafting="0.000000"',
+      "[mining]", 'mining_hc="0.000000"', 'mining="0.000000"',
+      "[gold]", 'gold_hc="0.000000"', 'gold="0.000000"',
+      "[shop]", 'currency="0.000000"', ""
+    ].join("\n");
+  }
+
+  function characterMetadata(text) {
+    const candidates = [];
+    for (const section of getSections(text)) {
+      const name = getIniFromBody(section.body, "name").trim();
+      const cls = getIniFromBody(section.body, "class").trim();
+      if (!name && !cls) continue;
+      let score = section.name === "0" ? 8 : 0;
+      if (name) score += 10;
+      if (name && !["new char", "unnamed"].includes(name.toLowerCase())) score += 35;
+      if (cls) score += 10;
+      if (cls && formatDisplayValue(cls, {classField:true, kind:"number"}) !== "Viking") score += 8;
+      for (const key of ["level", "herolevel", "experience", "playtime"]) {
+        const v = getIniFromBody(section.body, key);
+        if (Number.isFinite(parseNumber(v)) && parseNumber(v) > 0) score += 4;
+      }
+      candidates.push({score, name: name || "Unnamed", cls});
+    }
+    candidates.sort((a, b) => b.score - a.score);
+    const best = candidates[0] || {name:"Unnamed", cls:""};
+    return {name: best.name, className: best.cls ? formatDisplayValue(best.cls, {classField:true, kind:"number"}) : ""};
+  }
+
+  async function addFiles(files) {
+    for (const file of files) {
+      if (file.name.toLowerCase() === "shop.ini") {
+        state.shopFile = file;
+        state.shopRaw = normalizeLineEndings(await file.text());
+        continue;
+      }
+      if (!file.name.toLowerCase().endsWith(".hss")) continue;
+      let text = "", label = "Empty / unsupported", ok = false;
+      try {
+        text = await decodeHssFile(file);
+        if (/^\[[^\]]+\]\s*$/m.test(text)) {
+          const meta = characterMetadata(text);
+          label = `${meta.name}${meta.className ? " - " + meta.className : ""}`;
+          ok = true;
+        } else label = "Not a character";
+      } catch (err) {
+        label = "Empty / unsupported";
+      }
+      state.files.push({file, text, ok, label});
+    }
+    renderFileList();
+    if (state.activeIndex >= 0) populateFields();
+    status(`Loaded ${state.files.length} file(s) into the list.`);
+  }
+
+  function slotNumber(name) {
+    const m = name.replace(/\\/g, "/").match(/herosiege(\d+)\.hss$/i);
+    return m ? Number(m[1]) : null;
+  }
+
+  function renderFileList() {
+    const list = $("slotList");
+    list.innerHTML = "";
+    const indexed = state.files.map((f, i) => ({f, i})).sort((a, b) => {
+      const an = slotNumber(a.f.file.name), bn = slotNumber(b.f.file.name);
+      if (an !== null && bn !== null) return an - bn;
+      if (an !== null) return -1;
+      if (bn !== null) return 1;
+      return a.f.file.name.localeCompare(b.f.file.name);
+    });
+    for (const {f, i} of indexed) {
+      const n = slotNumber(f.file.name);
+      const li = document.createElement("li");
+      li.className = i === state.activeIndex ? "active" : "";
+      li.textContent = `${n === null ? f.file.name : "Slot " + String(n).padStart(2, "0")}   ${f.label}`;
+      li.onclick = () => selectFile(i);
+      list.appendChild(li);
+    }
+  }
+
+  function buildFields() {
+    const make = (container, specs) => {
+      container.innerHTML = "";
+      for (const spec of specs) {
+        const label = document.createElement("label");
+        label.textContent = spec.label;
+        container.appendChild(label);
+        let input;
+        if (spec.classField) {
+          input = document.createElement("select");
+          for (const name of Object.values(CLASS_ID_TO_NAME)) {
+            const opt = document.createElement("option");
+            opt.value = opt.textContent = name;
+            input.appendChild(opt);
+          }
+        } else {
+          input = document.createElement("input");
+        }
+        input.dataset.section = spec.section;
+        input.dataset.key = spec.key;
+        input.dataset.classField = spec.classField ? "1" : "";
+        spec.el = input;
+        container.appendChild(input);
+      }
+    };
+    make($("characterFields"), CHARACTER_FIELDS);
+    make($("professionFields"), PROFESSION_FIELDS);
+  }
+
+  function selectFile(index) {
+    const entry = state.files[index];
+    if (!entry || !entry.ok) {
+      alert("This is not a readable character save slot. Empty slots can be ignored.");
+      return;
+    }
+    state.activeIndex = index;
+    state.raw = entry.text;
+    $("currentFile").textContent = entry.file.name;
+    populateFields();
+    renderFileList();
+    status(`Loaded ${entry.file.name}.`);
+  }
+
+  function populateFields() {
+    for (const spec of ALL_FIELDS) {
+      const source = isShopBackedField(spec) && state.shopRaw !== null ? state.shopRaw : state.raw;
+      spec.el.value = getFieldValue(source, spec);
+    }
+  }
+
+  function mergeCharacterFields(text) {
+    for (const spec of ALL_FIELDS) {
+      if (isShopBackedField(spec)) continue;
+      const value = spec.el.value.trim();
+      if (value !== "") text = setFieldValue(text, spec, value);
+    }
+    return text;
+  }
+
+  function mergeShopFields(text) {
+    for (const spec of ALL_FIELDS) {
+      if (!isShopBackedField(spec)) continue;
+      const value = spec.el.value.trim();
+      if (value !== "") text = setFieldValue(text, spec, value);
+    }
+    return text;
+  }
+
+  function mergedSaveTexts() {
+    return {
+      characterText: mergeCharacterFields(state.raw),
+      shopText: mergeShopFields(state.shopRaw ?? defaultShopIniText())
+    };
+  }
+
+  async function buildEditedOutputs() {
+    const hadShopIni = state.shopRaw !== null;
+    const merged = mergedSaveTexts();
+    state.raw = merged.characterText;
+    if (hadShopIni) state.shopRaw = merged.shopText;
+    const encoded = await encodeHssText(state.raw);
+    return {
+      hadShopIni,
+      characterBlob: new Blob([encoded, "\0"], {type:"application/octet-stream"}),
+      shopBlob: hadShopIni ? new Blob([state.shopRaw], {type:"text/plain"}) : null
+    };
+  }
+
+  function requireSave() {
+    if (state.activeIndex < 0) {
+      alert("Open a character .hss file first.");
+      return false;
+    }
+    return true;
+  }
+
+  function unlockAllWaypoints(text) {
+    for (let act = 1; act <= 8; act++) {
+      text = setIniValue(text, "0", `act_${act}`, "4", "number");
+      for (let zone = 0; zone < 5; zone++) text = setIniValue(text, "0", `zone${act},${zone}`, "4", "number");
+    }
+    return text;
+  }
+
+  function unlockInferno(text) {
+    text = unlockAllWaypoints(text);
+    for (const [section, key, value, kind] of [
+      ["0","difficulty","3","number"], ["0","hell_subdifficulty","6","number"], ["0","act_previous","0","number"],
+      ["0","act_previous_0_0","3","number"], ["0","act_previous_1_0","1","number"], ["0","act_previous_2_0","1","number"],
+      ["0","act_previous_2_2","4","number"], ["0","act_previous_2_3","5","number"], ["0","act_previous_2_4","0","number"],
+      ["0","act_previous_3_0","3","number"], ["0","waypoints","eyB9","text"],
+      ["4","questlog_chain1","mainNightmare|1","text"], ["4","questlog_chain8","etheringHell|6","text"],
+      ["4","questlog_chain9","etheringDamnation|1","text"], ["4","questlog_chain12","mainHell|1","text"],
+      ["4","questlog_chain13","etheringInferno|1","text"], ["4","questlog_chain17","etheringChallengeInferno|1","text"],
+      ["4","questlog_diff5","3","number"], ["4","questlog_diff6","3","number"], ["4","questlog_diff7","3","number"],
+      ["4","questlog_diff8","2","number"], ["4","questlog_diff9","3","number"]
+    ]) text = setIniValue(text, section, key, value, kind);
+    for (let i = 5; i < 10; i++) text = setIniValue(text, "4", `questlog_sub_diff${i}`, "0", "number");
+    return text;
+  }
+
+  function decodeBase64Json(value) {
+    try {
+      const padded = value + "=".repeat((4 - value.length % 4) % 4);
+      return JSON.parse(new TextDecoder().decode(base64ToBytes(padded)));
+    } catch { return null; }
+  }
+
+  function iterInventoryPayloads(text) {
+    const out = [];
+    for (const section of ["inventory", "0"]) {
+      const value = getIniValue(text, section, "inventory");
+      const json = value ? decodeBase64Json(value) : null;
+      if (json && typeof json === "object") out.push([section, json]);
+    }
+    return out;
+  }
+
+  function compactValue(v) {
+    return typeof v === "number" && Number.isInteger(v) ? String(v) : String(v);
+  }
+
+  function summarizeData(data) {
+    return ["b","g","j","a","c","w","f","i","k","l","m","n","p","r"].filter(k => k in data).map(k => `${k}=${compactValue(data[k])}`).join(", ");
+  }
+
+  function decodeStatSlot(v) {
+    const d = typeof v === "string" ? decodeBase64Json(v) : v;
+    if (!d || typeof d !== "object" || !("a" in d) || !("b" in d)) return null;
+    return {a: Math.trunc(Number(d.a || 0)), b: Math.trunc(Number(d.b || 0)), n: Math.trunc(Number(d.n || 0))};
+  }
+
+  function statSlots(data) {
+    const rows = [];
+    for (let i = 1; i <= 6; i++) {
+      const slot = decodeStatSlot(data[`s${i}`]);
+      if (slot) rows.push(`s${i}: a=${slot.a} b=${slot.b} n=${slot.n}`);
+    }
+    return rows.join("; ") || "No s1-s6 slots";
+  }
+
+  function openInspector() {
+    if (!requireSave()) return;
+    const tbody = $("inspectorRows");
+    tbody.innerHTML = "";
+    const rows = [];
+    for (const [section, payload] of iterInventoryPayloads(mergeCharacterFields(state.raw))) {
+      for (const [container, items] of Object.entries(payload)) {
+        if (!items || typeof items !== "object") continue;
+        for (const [key, item] of Object.entries(items)) {
+          if (!item || typeof item !== "object") continue;
+          const data = item.data && typeof item.data === "object" ? item.data : item;
+          if (!data || typeof data !== "object") continue;
+          const pos = Array.isArray(item.pos) ? item.pos.map(compactValue).join(",") : "";
+          rows.push({section, container, key, item, data, pos});
+        }
+      }
+    }
+    for (const row of rows) {
+      const tr = document.createElement("tr");
+      const itemName = `item id ${compactValue(row.data.b ?? "?")}`;
+      tr.innerHTML = `<td>${escapeHtml(row.section)}</td><td>${escapeHtml(row.container)}</td><td>${escapeHtml(itemName)}</td><td>${escapeHtml(row.pos)}</td><td>${escapeHtml(summarizeData(row.data))}</td><td>${escapeHtml(statSlots(row.data))}</td>`;
+      tr.onclick = () => {
+        [...tbody.children].forEach(x => x.classList.remove("selected"));
+        tr.classList.add("selected");
+        $("inspectorDetails").textContent = `Section: ${row.section}\nContainer: ${row.container}\nKey: ${row.key}\nDecoded data: ${summarizeData(row.data)}\nStat slots: ${statSlots(row.data)}\n\nRaw decoded item JSON:\n\n${JSON.stringify(row.item, null, 2)}`;
+      };
+      tbody.appendChild(tr);
+    }
+    $("inspectorDetails").textContent = rows.length ? "Select an item." : "No inventory rows found.";
+    $("inspectorDialog").showModal();
+  }
+
+  buildFields();
+  $("fileInput").onchange = e => addFiles(e.target.files);
+  $("clearFiles").onclick = () => { state.files = []; state.activeIndex = -1; state.raw = ""; state.shopFile = null; state.shopRaw = null; renderFileList(); $("currentFile").textContent = "No character save loaded"; status("Ready"); };
+  $("dropZone").ondragover = e => { e.preventDefault(); $("dropZone").classList.add("drag"); };
+  $("dropZone").ondragleave = () => $("dropZone").classList.remove("drag");
+  $("dropZone").ondrop = e => { e.preventDefault(); $("dropZone").classList.remove("drag"); addFiles(e.dataTransfer.files); };
+  $("rawBtn").onclick = () => { if (!requireSave()) return; $("rawText").value = mergeCharacterFields(state.raw); $("rawDialog").showModal(); };
+  $("rawClose").onclick = () => { state.raw = normalizeLineEndings($("rawText").value); populateFields(); $("rawDialog").close(); };
+  $("rawFind").onclick = () => {
+    const q = $("rawSearch").value;
+    const box = $("rawText");
+    const idx = box.value.toLowerCase().indexOf(q.toLowerCase(), box.selectionEnd || 0);
+    if (q && idx >= 0) { box.focus(); box.setSelectionRange(idx, idx + q.length); }
+  };
+  $("inspectBtn").onclick = openInspector;
+  $("inspectorClose").onclick = () => $("inspectorDialog").close();
+  $("waypointsBtn").onclick = () => { if (!requireSave()) return; state.raw = unlockAllWaypoints(mergeCharacterFields(state.raw)); populateFields(); status("All act/zone waypoint values set to 4. Download the edited save to write it."); };
+  $("infernoBtn").onclick = () => { if (!requireSave()) return; state.raw = unlockInferno(mergeCharacterFields(state.raw)); populateFields(); status("Inferno difficulty/progress flags set. Download the edited save to write it."); };
+  $("downloadBtn").onclick = async () => {
+    if (!requireSave()) return;
+    try {
+      const outputs = await buildEditedOutputs();
+      const file = state.files[state.activeIndex].file;
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(outputs.characterBlob);
+      a.download = file.name;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      if (outputs.hadShopIni) {
+        const shop = document.createElement("a");
+        shop.href = URL.createObjectURL(outputs.shopBlob);
+        shop.download = state.shopFile?.name || "shop.ini";
+        shop.click();
+        URL.revokeObjectURL(shop.href);
+        status(`Downloaded ${a.download} and ${shop.download}. Replace the originals while the game is closed.`);
+      } else {
+        status(`Downloaded ${a.download}. Replace the original while the game is closed.`);
+      }
+    } catch (err) {
+      alert(`Could not encode save:\n${err.message || err}`);
+    }
+  };
+
+  $("directSaveBtn").onclick = async () => {
+    if (!requireSave()) return;
+    const file = state.files[state.activeIndex].file;
+    if (!window.showSaveFilePicker) {
+      alert("Direct save is not supported in this browser. Use Download Edited .hss instead. Chrome, Edge, and Chromium usually support direct save.");
+      return;
+    }
+    try {
+      const handle = await pickFileForSave(
+        file.name,
+        "hero-siege-character-save",
+        "Hero Siege character save",
+        {"application/octet-stream": [".hss"]}
+      );
+      const outputs = await buildEditedOutputs();
+      await writeBlobToHandle(handle, outputs.characterBlob);
+      const savedName = handle.name || file.name;
+      if (outputs.hadShopIni) {
+        status(`Saved ${savedName} directly. For shop.ini, use Download Edited .hss so the browser can save it with the original name too.`);
+      } else {
+        status(`Saved ${savedName} directly. Keep the game closed while replacing saves.`);
+      }
+    } catch (err) {
+      if (err && err.name === "AbortError") {
+        status("Direct save cancelled.");
+      } else {
+        alert(`Could not save directly:\n${err.message || err}`);
+      }
+    }
+  };
+  </script>
+</body>
+</html>
